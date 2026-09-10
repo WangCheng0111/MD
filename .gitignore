@@ -47,11 +47,9 @@ CodeCoverage/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# Visual Studio local state
+.vs/
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
-
-# NUnit
-*.VisualState.xml
-TestResult.xml
-nunit-*.xml
