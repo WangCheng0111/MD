@@ -189,10 +189,22 @@ namespace MD
 
             var titleBarBounds = AppTitleBar.TransformToVisual(null)
                 .TransformBounds(new Rect(0, 0, AppTitleBar.ActualWidth, AppTitleBar.ActualHeight));
+            // 标签条左侧的图标/标题区保持与原标题栏一致的可拖动行为
+            var headerBounds = TitleBarHeaderRegion.TransformToVisual(null)
+                .TransformBounds(new Rect(0, 0, TitleBarHeaderRegion.ActualWidth, TitleBarHeaderRegion.ActualHeight));
+            var headerCaptionRect = GetRect(
+                new Rect(headerBounds.X, titleBarBounds.Y,
+                         headerBounds.Width,
+                         titleBarBounds.Height),
+                scaleAdjustment);
+            // 标签条右侧的空白拖拽区：Caption 从它的左缘开始，标签条本身留给 XAML 交互
+            var dragRegionBounds = DocumentTabs.DragRegion.TransformToVisual(null)
+                .TransformBounds(new Rect(0, 0, DocumentTabs.DragRegion.ActualWidth, DocumentTabs.DragRegion.ActualHeight));
             var minimizeLeft = MinimizeButton.TransformToVisual(null).TransformPoint(new Point(0, 0));
+            var captionLeft = Math.Min(dragRegionBounds.X, minimizeLeft.X);
             var captionRect = GetRect(
-                new Rect(titleBarBounds.X, titleBarBounds.Y,
-                         minimizeLeft.X - titleBarBounds.X,
+                new Rect(captionLeft, titleBarBounds.Y,
+                         Math.Max(0, minimizeLeft.X - captionLeft),
                          titleBarBounds.Height),
                 scaleAdjustment);
 
@@ -232,7 +244,7 @@ namespace MD
                 _closeRect.Height);
 
             ApplyRegionRects(NonClientRegionKind.Caption,
-                new[] { captionRect, topGapRect, bottomGapRect, minMaxGapRect, maxCloseGapRect, closeRightGapRect });
+                new[] { headerCaptionRect, captionRect, topGapRect, bottomGapRect, minMaxGapRect, maxCloseGapRect, closeRightGapRect });
                 ApplyRegionRects(NonClientRegionKind.Minimize, new[] { _minimizeRect });
                 ApplyRegionRects(NonClientRegionKind.Maximize, new[] { _maximizeRect });
                 ApplyRegionRects(NonClientRegionKind.Close, new[] { _closeRect });
@@ -391,6 +403,7 @@ namespace MD
                     ResetCaptionButtonStates();
                 }
                 AnimateWindowActivation(deactivated, pressedButton);
+                DocumentTabs.AnimateActivation(!deactivated);
             });
         }
 

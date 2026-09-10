@@ -3,6 +3,7 @@
     x:Class="MD.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:MD.Controls"
     Title="MD">
 
     <Window.SystemBackdrop>
@@ -20,7 +21,27 @@
                 Background="#80FFFFFF"
                 IsHitTestVisible="False"/>
 
-        <Grid x:Name="AppTitleBar" Height="48">
+        <controls:EdgeTabView x:Name="DocumentTabs"
+                              Grid.RowSpan="2">
+            <controls:EdgeTabView.Header>
+                <StackPanel x:Name="TitleBarHeaderRegion"
+                            Orientation="Horizontal">
+                    <Image x:Name="TitleBarIcon"
+                           Source="ms-appx:///Assets/Tiles/GalleryIcon.ico"
+                           Width="16" Height="16"
+                           Margin="12,0,8,0"
+                           VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TitleBarTextBlock"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               FontFamily="{StaticResource HarmonyOSRegular}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </controls:EdgeTabView.Header>
+        </controls:EdgeTabView>
+
+        <Grid x:Name="AppTitleBar"
+              Height="48"
+              VerticalAlignment="Top">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftPaddingColumn" Width="0"/>
                 <ColumnDefinition x:Name="IconColumn" Width="Auto"/>
@@ -31,18 +52,6 @@
                 <ColumnDefinition x:Name="CloseButtonColumn" Width="Auto"/>
                 <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
             </Grid.ColumnDefinitions>
-
-            <Image x:Name="TitleBarIcon"
-                   Source="ms-appx:///Assets/Tiles/GalleryIcon.ico"
-                   Grid.Column="1"
-                   Width="16" Height="16"
-                   Margin="12,0,8,0"
-                   VerticalAlignment="Center"/>
-            <TextBlock x:Name="TitleBarTextBlock"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       FontFamily="{StaticResource HarmonyOSRegular}"
-                       Grid.Column="2"
-                       VerticalAlignment="Center"/>
 
             <Button x:Name="MinimizeButton"
                     Grid.Column="4"

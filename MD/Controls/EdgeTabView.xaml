@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="MD.Controls.EdgeTabView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style x:Key="AddTabButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#99000000" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="FontFamily" Value="{ThemeResource SymbolThemeFontFamily}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="UseSystemFocusVisuals" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="AddRoot"
+                              Background="{TemplateBinding Background}"
+                              CornerRadius="{TemplateBinding CornerRadius}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Content="{TemplateBinding Content}"
+                                              FontFamily="{TemplateBinding FontFamily}"
+                                              FontSize="{TemplateBinding FontSize}"
+                                              Foreground="{TemplateBinding Foreground}" />
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="AddRoot.Background" Value="#14000000" />
+                                            <Setter Target="AddRoot.Opacity" Value="1" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="AddRoot.Background" Value="#1F000000" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="StripRoot" Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ContentPresenter x:Name="HeaderPresenter" />
+
+            <StackPanel x:Name="TabsPanel"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Bottom" />
+
+            <Button x:Name="AddButton"
+                    Grid.Column="2"
+                    Style="{StaticResource AddTabButtonStyle}"
+                    Content="&#xE710;"
+                    VerticalAlignment="Bottom"
+                    Margin="8,0,0,0"
+                    Click="AddButton_Click" />
+
+            <!-- 标签右侧的空白拖拽区（标题栏拖动由窗口 Caption 区域接管） -->
+            <Grid x:Name="DragArea"
+                  Grid.Column="3"
+                  MinWidth="48"
+                  Background="Transparent" />
+        </Grid>
+
+        <ContentPresenter x:Name="ContentHost" Grid.Row="1" />
+    </Grid>
+</UserControl>
