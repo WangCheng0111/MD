@@ -31,21 +31,6 @@
                                               FontFamily="{TemplateBinding FontFamily}"
                                               FontSize="{TemplateBinding FontSize}"
                                               Foreground="{TemplateBinding Foreground}" />
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal" />
-                                    <VisualState x:Name="PointerOver">
-                                        <VisualState.Setters>
-                                            <Setter Target="CloseRoot.Background" Value="#14000000" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <VisualState.Setters>
-                                            <Setter Target="CloseRoot.Background" Value="#1F000000" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -60,6 +45,11 @@
           PointerMoved="OnPointerMoved"
           PointerReleased="OnPointerReleased"
           PointerCaptureLost="OnPointerCaptureLost">
+        <Border x:Name="StateBackground"
+                CornerRadius="12,12,0,0"
+                Background="Transparent"
+                IsHitTestVisible="False" />
+
         <!-- 相邻未选中标签之间的分隔线（由父级控制显隐） -->
         <Border x:Name="Separator"
                 Width="1" Height="16"
@@ -93,6 +83,15 @@
                            FontSize="12"
                            Foreground="#99000000"
                            TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="HeaderBoldPlaceholder"
+                           Grid.Column="1"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0"
+                           IsHitTestVisible="False"
+                           TextTrimming="CharacterEllipsis"
+                           AutomationProperties.AccessibilityView="Raw" />
                 <Button x:Name="CloseButton"
                         Grid.Column="2"
                         Margin="4,0,0,0"
@@ -102,7 +101,13 @@
             </Grid>
         </Border>
 
-        <!-- 最右侧标签与"+"之间的分隔线（由父级控制显隐；置于 Body 之上以便选中态可见） -->
+        <Border x:Name="Outline"
+                BorderThickness="1,1,1,0"
+                CornerRadius="12,12,0,0"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False" />
+
+        <!-- 最右侧标签与"+"之间的分隔线（由父级控制显隐） -->
         <Border x:Name="SeparatorRight"
                 Width="1" Height="16"
                 HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -114,16 +119,16 @@
         <Path x:Name="LeftFlare"
               IsHitTestVisible="False"
               HorizontalAlignment="Left" VerticalAlignment="Bottom"
-              Width="8" Height="8"
-              Margin="-8,0,0,0"
-              Fill="Transparent"
-              Data="M8,0 A8,8 0 0 1 0,8 L8,8 Z" />
+              Fill="Transparent" />
         <Path x:Name="RightFlare"
               IsHitTestVisible="False"
               HorizontalAlignment="Right" VerticalAlignment="Bottom"
-              Width="8" Height="8"
-              Margin="0,0,-8,0"
-              Fill="Transparent"
-              Data="M0,0 A8,8 0 0 0 8,8 L0,8 Z" />
+              Fill="Transparent" />
+        <Path x:Name="LeftFlareOutline"
+              IsHitTestVisible="False"
+              HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+        <Path x:Name="RightFlareOutline"
+              IsHitTestVisible="False"
+              HorizontalAlignment="Right" VerticalAlignment="Bottom" />
     </Grid>
 </UserControl>

@@ -8,12 +8,17 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
+using Windows.UI;
 
 namespace MD.Controls
 {
     public sealed partial class EdgeTabView : UserControl
     {
         private const int VkLeftButton = 0x01;
+
+        private static readonly Color AddButtonHoverColor = Color.FromArgb(0x14, 0x00, 0x00, 0x00);
+        private static readonly Color AddButtonPressedColor = Color.FromArgb(0x1F, 0x00, 0x00, 0x00);
+        private static readonly Color TransparentColor = Color.FromArgb(0x00, 0xFF, 0xFF, 0xFF);
 
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int vKey);
@@ -26,19 +31,27 @@ namespace MD.Controls
                 new PropertyMetadata(null, OnHeaderChanged));
 
         private readonly List<EdgeTabItem> _tabs = new();
-        private readonly Dictionary<EdgeTabItem, double> _layoutLefts = new();
         private readonly DispatcherQueueTimer _dragWatchTimer;
+        private readonly SolidColorBrush _addButtonBrush = new(TransparentColor);
         private EdgeTabItem? _selected;
 
         private bool _isWindowActive = true;
+        private bool _addButtonPointerOver;
+        private bool _addButtonPressed;
 
         private EdgeTabItem? _dragItem;
         private int _dragStartIndex;
         private int _dragTargetIndex;
         private double _dragStartPointerX;
         private double _dragItemWidth;
+        private double _dragItemLeft;
         private double _dragMinTranslation;
         private double _dragMaxTranslation;
+        private double _dragTranslation;
+
+        private double _dividerHoleLeft = double.NaN;
+        private double _dividerHoleRight = double.NaN;
+        private double _dividerWidth = double.NaN;
 
         public EdgeTabView()
         {
@@ -59,6 +72,15 @@ namespace MD.Controls
                     CommitDrag();
                 }
             };
+
+            TabsPanel.LayoutUpdated += (_, _) => UpdateBottomDivider();
+
+            AddButton.Background = _addButtonBrush;
+            AddButton.AddHandler(UIElement.PointerEnteredEvent, new PointerEventHandler(AddButton_PointerEntered), true);
+            AddButton.AddHandler(UIElement.PointerExitedEvent, new PointerEventHandler(AddButton_PointerExited), true);
+            AddButton.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(AddButton_PointerPressed), true);
+            AddButton.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(AddButton_PointerReleased), true);
+            AddButton.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(AddButton_PointerCaptureLost), true);
         }
 
         public event EventHandler? AddTabRequested;
@@ -135,6 +157,7 @@ namespace MD.Controls
             }
 
             UpdateSeparators();
+            UpdateBottomDivider();
         }
 
         public void SelectTab(EdgeTabItem item)
@@ -154,6 +177,7 @@ namespace MD.Controls
             UpdateZOrder();
             ContentHost.Content = item.TabContent;
             UpdateSeparators();
+            UpdateBottomDivider();
         }
 
         // 选中标签需绘制在邻居之上，否则伸出的外翻角会被邻居（悬停背景）盖住
@@ -201,22 +225,29 @@ namespace MD.Controls
             _dragStartIndex = _tabs.IndexOf(item);
             _dragTargetIndex = _dragStartIndex;
             _dragStartPointerX = pointerX;
+            _dragTranslation = 0;
+
+            UpdateLayout();
+
             _dragItemWidth = item.ActualWidth;
 
             // 布局位置按顺序累加（不含 RenderTransform，避免受上一次落位动画影响）
-            _layoutLefts.Clear();
             double left = 0;
+            double itemLeft = 0;
             foreach (var tab in _tabs)
             {
-                _layoutLefts[tab] = left;
+                if (tab == item)
+                {
+                    itemLeft = left;
+                }
+
                 left += tab.ActualWidth;
             }
 
             // 限制拖动范围：标签不能移出整个标签条（第一个不能再往左，最后一个不能再往右）
-            double totalWidth = left;
-            double itemLeft = _layoutLefts[item];
+            _dragItemLeft = itemLeft;
             _dragMinTranslation = -itemLeft;
-            _dragMaxTranslation = totalWidth - itemLeft - _dragItemWidth;
+            _dragMaxTranslation = left - itemLeft - _dragItemWidth;
 
             Canvas.SetZIndex(item, 1000);
             _dragWatchTimer.Start();
@@ -230,11 +261,13 @@ namespace MD.Controls
             }
 
             double translation = Math.Clamp(pointerX - _dragStartPointerX, _dragMinTranslation, _dragMaxTranslation);
+            _dragTranslation = translation;
             SetTranslation(_dragItem, translation, false);
+            UpdateBottomDivider();
 
             // 目标索引：被拖标签左缘最接近哪个候选槽位（其余标签按原顺序紧密排列时的插入点）。
             // 不能用"中心点比较"：标签宽度不同时，被拖标签中心受钳制后可能永远越不过首/尾标签的中心。
-            double draggedLeft = _layoutLefts[_dragItem] + translation;
+            double draggedLeft = _dragItemLeft + translation;
             double best = double.MaxValue;
             int target = 0;
             double slotLeft = 0;
@@ -364,6 +397,7 @@ namespace MD.Controls
             }
 
             UpdateZOrder();
+            UpdateBottomDivider();
         }
 
         private static void SetTranslation(EdgeTabItem item, double x, bool animate)
@@ -415,7 +449,7 @@ namespace MD.Controls
         #endregion
 
         // 分隔线：仅显示在两个相邻且都未选中、未悬停的标签之间；
-        // 最后一个标签的右侧（与"+"之间）也显示，悬停时隐藏
+        // 最后一个标签的右侧（与"+"之间）同样在未选中、未悬停时显示
         private void UpdateSeparators()
         {
             for (int i = 0; i < _tabs.Count; i++)
@@ -431,8 +465,125 @@ namespace MD.Controls
                 }
 
                 _tabs[i].SetSeparatorVisible(visible);
-                _tabs[i].SetRightSeparatorVisible(i == _tabs.Count - 1 && !_tabs[i].IsPointerOver);
+                _tabs[i].SetRightSeparatorVisible(
+                    i == _tabs.Count - 1 && !_tabs[i].IsSelected && !_tabs[i].IsPointerOver);
             }
+        }
+
+        private void UpdateBottomDivider()
+        {
+            double width = BottomDividerCanvas.ActualWidth;
+            if (width <= 0)
+            {
+                return;
+            }
+
+            double holeLeft;
+            double holeRight;
+
+            if (_selected == null)
+            {
+                holeLeft = width;
+                holeRight = width;
+            }
+            else if (_dragItem == _selected)
+            {
+                holeLeft = GetTabsPanelLeft() + _dragItemLeft + _dragTranslation;
+                holeRight = holeLeft + _dragItemWidth;
+            }
+            else
+            {
+                holeLeft = GetTabsPanelLeft();
+                foreach (var tab in _tabs)
+                {
+                    if (tab == _selected)
+                    {
+                        break;
+                    }
+
+                    holeLeft += tab.ActualWidth;
+                }
+
+                holeRight = holeLeft + _selected.ActualWidth;
+            }
+
+            holeLeft = Math.Max(0, holeLeft - EdgeTabItem.FlareSize);
+            holeRight = Math.Min(width, holeRight + EdgeTabItem.FlareSize);
+
+            if (width == _dividerWidth && holeLeft == _dividerHoleLeft && holeRight == _dividerHoleRight)
+            {
+                return;
+            }
+
+            _dividerWidth = width;
+            _dividerHoleLeft = holeLeft;
+            _dividerHoleRight = holeRight;
+
+            BottomDividerLeft.Width = holeLeft;
+            BottomDividerRight.Width = width - holeRight;
+            Canvas.SetLeft(BottomDividerRight, holeRight);
+        }
+
+        private double GetTabsPanelLeft()
+        {
+            return TabsPanel.TransformToVisual(StripRoot).TransformPoint(new Point(0, 0)).X;
+        }
+
+        private void AddButton_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            _addButtonPointerOver = true;
+            UpdateAddButtonVisual(true);
+        }
+
+        private void AddButton_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            _addButtonPointerOver = false;
+            UpdateAddButtonVisual(true);
+        }
+
+        private void AddButton_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            _addButtonPressed = true;
+            UpdateAddButtonVisual(false);
+        }
+
+        private void AddButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            _addButtonPressed = false;
+            UpdateAddButtonVisual(false);
+        }
+
+        private void AddButton_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            _addButtonPressed = false;
+            UpdateAddButtonVisual(false);
+        }
+
+        private void UpdateAddButtonVisual(bool animate)
+        {
+            Color to = _addButtonPressed && _addButtonPointerOver ? AddButtonPressedColor
+                : _addButtonPointerOver ? AddButtonHoverColor
+                : TransparentColor;
+
+            bool shouldAnimate = animate && !_addButtonPressed;
+
+            var animation = new ColorAnimation
+            {
+                From = _addButtonBrush.Color,
+                To = to,
+                Duration = shouldAnimate ? TimeSpan.FromMilliseconds(150) : TimeSpan.Zero
+            };
+
+            if (shouldAnimate)
+            {
+                animation.EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut };
+            }
+
+            var storyboard = new Storyboard();
+            Storyboard.SetTarget(animation, _addButtonBrush);
+            Storyboard.SetTargetProperty(animation, "Color");
+            storyboard.Children.Add(animation);
+            storyboard.Begin();
         }
 
         private void AddButton_Click(object sender, RoutedEventArgs e)

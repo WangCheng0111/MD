@@ -3,7 +3,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Shapes;
 using System;
+using Windows.Foundation;
 using Windows.UI;
 
 namespace MD.Controls
@@ -20,18 +22,60 @@ namespace MD.Controls
         private static readonly Color ForegroundHover = Color.FromArgb(0xCC, 0x00, 0x00, 0x00);
         private static readonly Color ForegroundPressed = Color.FromArgb(0xE6, 0x00, 0x00, 0x00);
         private static readonly Color ForegroundSelected = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+        private static readonly Color OutlineColor = Color.FromArgb(0x1A, 0x00, 0x00, 0x00);
+        private static readonly Color CloseButtonHoverColor = Color.FromArgb(0x14, 0x00, 0x00, 0x00);
+        private static readonly Color CloseButtonPressedColor = Color.FromArgb(0x1F, 0x00, 0x00, 0x00);
+
+        private static readonly SolidColorBrush TransparentBrush = new(Transparent);
+        private static readonly SolidColorBrush OutlineBrush = new(OutlineColor);
+
+        private readonly SolidColorBrush _bodyBrush = new(Transparent);
+        private readonly SolidColorBrush _stateBrush = new(Transparent);
+        private readonly SolidColorBrush _foregroundBrush = new(ForegroundNormal);
+        private readonly SolidColorBrush _closeButtonBrush = new(Transparent);
 
         private bool _isSelected;
         private bool _isPointerOver;
         private bool _isPressed;
         private bool _isDragging;
+        private bool _lastSelected;
+        private bool _lastPointerOver;
+        private bool _lastPressed;
+        private bool _closeButtonPointerOver;
+        private bool _closeButtonPressed;
         private Windows.Foundation.Point _pressPoint;
+
+        public const double FlareSize = 12;
 
         private const double DragThreshold = 4.0;
 
         public EdgeTabItem()
         {
             InitializeComponent();
+
+            // 标签 1px 外框延伸到外翻角新顶端（外翻角整体下移了 1px）
+            Outline.Height = Root.Height - FlareSize + 1;
+
+            ConfigureFlare(LeftFlare, true, FlareSize, CreateFlareGeometry(true));
+            ConfigureFlare(RightFlare, false, FlareSize, CreateFlareGeometry(false));
+            ConfigureFlare(LeftFlareOutline, true, FlareSize + 1, CreateFlareArcGeometry(true));
+            ConfigureFlare(RightFlareOutline, false, FlareSize + 1, CreateFlareArcGeometry(false));
+
+            Body.Background = _bodyBrush;
+            LeftFlare.Fill = _bodyBrush;
+            RightFlare.Fill = _bodyBrush;
+            StateBackground.Background = _stateBrush;
+            HeaderText.Foreground = _foregroundBrush;
+            IconControl.Foreground = _foregroundBrush;
+            CloseButton.Foreground = _foregroundBrush;
+
+            CloseButton.Background = _closeButtonBrush;
+            CloseButton.AddHandler(UIElement.PointerEnteredEvent, new PointerEventHandler(CloseButton_PointerEntered), true);
+            CloseButton.AddHandler(UIElement.PointerExitedEvent, new PointerEventHandler(CloseButton_PointerExited), true);
+            CloseButton.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(CloseButton_PointerPressed), true);
+            CloseButton.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(CloseButton_PointerReleased), true);
+            CloseButton.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(CloseButton_PointerCaptureLost), true);
+
             ApplyVisual();
         }
 
@@ -53,7 +97,11 @@ namespace MD.Controls
         public string Header
         {
             get => HeaderText.Text;
-            set => HeaderText.Text = value;
+            set
+            {
+                HeaderText.Text = value;
+                HeaderBoldPlaceholder.Text = value;
+            }
         }
 
         public object? TabContent { get; set; }
@@ -135,45 +183,154 @@ namespace MD.Controls
 
         private void ApplyVisual()
         {
-            Color background;
-            Color foreground;
+            Color bodyColor;
+            Color stateColor;
+            Color foregroundColor;
 
             if (_isSelected)
             {
-                background = _isPressed ? SelectedBackgroundPressed
+                bodyColor = _isPressed ? SelectedBackgroundPressed
                     : _isPointerOver ? SelectedBackgroundPointerOver
                     : SelectedBackground;
-                foreground = ForegroundSelected;
-            }
-            else if (_isPressed)
-            {
-                background = PressedBackground;
-                foreground = ForegroundPressed;
-            }
-            else if (_isPointerOver)
-            {
-                background = HoverBackground;
-                foreground = ForegroundHover;
+                stateColor = Transparent;
+                foregroundColor = ForegroundSelected;
             }
             else
             {
-                background = Transparent;
-                foreground = ForegroundNormal;
+                bodyColor = Transparent;
+                stateColor = _isPressed ? PressedBackground
+                    : _isPointerOver ? HoverBackground
+                    : Transparent;
+                foregroundColor = _isPressed ? ForegroundPressed
+                    : _isPointerOver ? ForegroundHover
+                    : ForegroundNormal;
             }
 
-            var backgroundBrush = new SolidColorBrush(background);
-            Body.Background = backgroundBrush;
-            LeftFlare.Fill = backgroundBrush;
-            RightFlare.Fill = backgroundBrush;
+            // 仅悬停进入/离开做过渡动画；按下、选中切换均为瞬时
+            bool animate = _isSelected == _lastSelected &&
+                           !_isPressed && !_lastPressed &&
+                           _isPointerOver != _lastPointerOver;
 
-            var foregroundBrush = new SolidColorBrush(foreground);
-            HeaderText.Foreground = foregroundBrush;
-            IconControl.Foreground = foregroundBrush;
-            CloseButton.Foreground = foregroundBrush;
+            _lastSelected = _isSelected;
+            _lastPointerOver = _isPointerOver;
+            _lastPressed = _isPressed;
+
+            var storyboard = new Storyboard();
+            AddColorAnimation(storyboard, _bodyBrush, bodyColor, animate);
+            AddColorAnimation(storyboard, _stateBrush, stateColor, animate);
+            AddColorAnimation(storyboard, _foregroundBrush, foregroundColor, animate);
+            storyboard.Begin();
+
+            var outlineBrush = _isSelected ? OutlineBrush : TransparentBrush;
+            Outline.BorderBrush = outlineBrush;
+            LeftFlareOutline.Fill = outlineBrush;
+            RightFlareOutline.Fill = outlineBrush;
 
             HeaderText.FontWeight = _isSelected
                 ? Microsoft.UI.Text.FontWeights.SemiBold
                 : Microsoft.UI.Text.FontWeights.Normal;
+        }
+
+        private static void AddColorAnimation(Storyboard storyboard, SolidColorBrush brush, Color to, bool animate)
+        {
+            var animation = new ColorAnimation
+            {
+                From = brush.Color,
+                To = to,
+                Duration = animate ? TimeSpan.FromMilliseconds(150) : TimeSpan.Zero
+            };
+
+            if (animate)
+            {
+                animation.EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut };
+            }
+
+            Storyboard.SetTarget(animation, brush);
+            Storyboard.SetTargetProperty(animation, "Color");
+            storyboard.Children.Add(animation);
+        }
+
+        private static void ConfigureFlare(Path path, bool left, double width, Geometry data)
+        {
+            path.Width = width;
+            path.Height = FlareSize;
+
+            // 底部多伸出 1px：分割线画在内容区第一行（标题栏下方 1px），
+            // 外翻角底边必须落到同一行，圆弧描边才能和分割线衔接上
+            path.Margin = left ? new Thickness(-FlareSize, 0, 0, -1) : new Thickness(0, 0, -FlareSize, -1);
+            path.Data = data;
+        }
+
+        private static PathFigure CreateFlareFigure(bool left)
+        {
+            var figure = new PathFigure
+            {
+                StartPoint = left ? new Point(FlareSize, 0) : new Point(0, 0)
+            };
+
+            figure.Segments.Add(new ArcSegment
+            {
+                Point = left ? new Point(0, FlareSize) : new Point(FlareSize, FlareSize),
+                Size = new Size(FlareSize, FlareSize),
+                SweepDirection = left ? SweepDirection.Clockwise : SweepDirection.Counterclockwise
+            });
+
+            return figure;
+        }
+
+        private static Geometry CreateFlareGeometry(bool left)
+        {
+            var figure = CreateFlareFigure(left);
+            figure.Segments.Add(new LineSegment
+            {
+                Point = left ? new Point(FlareSize, FlareSize) : new Point(0, FlareSize)
+            });
+            figure.IsClosed = true;
+            return new PathGeometry { Figures = { figure } };
+        }
+
+        private static Geometry CreateFlareArcGeometry(bool left)
+        {
+            double inner = FlareSize + 1;
+            double tangent = Math.Sqrt(2 * FlareSize + 1);
+            double edge = Math.Sqrt(2 * FlareSize - 1);
+
+            var figure = new PathFigure
+            {
+                StartPoint = left ? new Point(FlareSize, 0) : new Point(1, 0),
+                IsClosed = true
+            };
+
+            figure.Segments.Add(new ArcSegment
+            {
+                Point = left ? new Point(edge, FlareSize - 1) : new Point(FlareSize + 1 - edge, FlareSize - 1),
+                Size = new Size(FlareSize, FlareSize),
+                SweepDirection = left ? SweepDirection.Clockwise : SweepDirection.Counterclockwise
+            });
+
+            figure.Segments.Add(new LineSegment
+            {
+                Point = left ? new Point(0, FlareSize - 1) : new Point(FlareSize + 1, FlareSize - 1)
+            });
+
+            figure.Segments.Add(new LineSegment
+            {
+                Point = left ? new Point(0, FlareSize) : new Point(FlareSize + 1, FlareSize)
+            });
+
+            figure.Segments.Add(new LineSegment
+            {
+                Point = left ? new Point(tangent, FlareSize) : new Point(FlareSize + 1 - tangent, FlareSize)
+            });
+
+            figure.Segments.Add(new ArcSegment
+            {
+                Point = left ? new Point(inner, 0) : new Point(0, 0),
+                Size = new Size(inner, inner),
+                SweepDirection = left ? SweepDirection.Counterclockwise : SweepDirection.Clockwise
+            });
+
+            return new PathGeometry { Figures = { figure } };
         }
 
         private static bool IsWithinCloseButton(object? source)
@@ -220,17 +377,20 @@ namespace MD.Controls
                 return;
             }
 
+            var point = e.GetCurrentPoint(this);
+            if (!point.Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
             _isPressed = true;
-            _pressPoint = e.GetCurrentPoint(this).Position;
+            _pressPoint = point.Position;
             ApplyVisual();
 
             // 捕获指针：否则指针移出标签条（标题栏）后收不到 PointerMoved，拖动会中断。
             // 必须捕获在 Root（事件处理器所在元素）上：捕获后事件从被捕获元素开始路由，
             // 若捕获在 UserControl 上，其子元素 Root 的处理器不会触发。
             ((UIElement)sender).CapturePointer(e.Pointer);
-
-            // 左键按下即切换标签（与 Edge 一致），而不是等到松开
-            SelectRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
@@ -253,6 +413,7 @@ namespace MD.Controls
                 _isDragging = true;
                 _isPressed = false;
                 ApplyVisual();
+                SelectRequested?.Invoke(this, EventArgs.Empty);
                 DragStarted?.Invoke(this, GetParentX(e));
             }
 
@@ -272,9 +433,16 @@ namespace MD.Controls
                 return;
             }
 
+            var point = e.GetCurrentPoint(this);
+            bool wasPressed = _isPressed;
             _isPressed = false;
             ((UIElement)sender).ReleasePointerCapture(e.Pointer);
             ApplyVisual();
+
+            if (wasPressed && !point.Properties.IsLeftButtonPressed)
+            {
+                SelectRequested?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         private void OnPointerCaptureLost(object sender, PointerRoutedEventArgs e)
@@ -298,6 +466,47 @@ namespace MD.Controls
         private bool IsPointWithin(Windows.Foundation.Point point)
         {
             return point.X >= 0 && point.X <= ActualWidth && point.Y >= 0 && point.Y <= ActualHeight;
+        }
+
+        private void CloseButton_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            _closeButtonPointerOver = true;
+            UpdateCloseButtonVisual(true);
+        }
+
+        private void CloseButton_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            _closeButtonPointerOver = false;
+            UpdateCloseButtonVisual(true);
+        }
+
+        private void CloseButton_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            _closeButtonPressed = true;
+            UpdateCloseButtonVisual(false);
+        }
+
+        private void CloseButton_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            _closeButtonPressed = false;
+            UpdateCloseButtonVisual(false);
+        }
+
+        private void CloseButton_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+        {
+            _closeButtonPressed = false;
+            UpdateCloseButtonVisual(false);
+        }
+
+        private void UpdateCloseButtonVisual(bool animate)
+        {
+            Color to = _closeButtonPressed && _closeButtonPointerOver ? CloseButtonPressedColor
+                : _closeButtonPointerOver ? CloseButtonHoverColor
+                : Transparent;
+
+            var storyboard = new Storyboard();
+            AddColorAnimation(storyboard, _closeButtonBrush, to, animate && !_closeButtonPressed);
+            storyboard.Begin();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

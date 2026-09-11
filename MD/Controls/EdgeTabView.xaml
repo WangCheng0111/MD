@@ -23,31 +23,17 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="AddRoot"
-                              Background="{TemplateBinding Background}"
-                              CornerRadius="{TemplateBinding CornerRadius}">
+                        <Grid x:Name="AddRoot">
+                            <Grid x:Name="AddBackground"
+                                  Background="{TemplateBinding Background}"
+                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                  Margin="4" />
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               Content="{TemplateBinding Content}"
                                               FontFamily="{TemplateBinding FontFamily}"
                                               FontSize="{TemplateBinding FontSize}"
                                               Foreground="{TemplateBinding Foreground}" />
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal" />
-                                    <VisualState x:Name="PointerOver">
-                                        <VisualState.Setters>
-                                            <Setter Target="AddRoot.Background" Value="#14000000" />
-                                            <Setter Target="AddRoot.Opacity" Value="1" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <VisualState.Setters>
-                                            <Setter Target="AddRoot.Background" Value="#1F000000" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -61,7 +47,9 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="StripRoot" Grid.Row="0">
+        <!-- ZIndex=1：选中标签的外翻角会向下溢出 1px 到内容区第一行（与分割线衔接），
+             需盖在 ContentHost 背景之上，否则会被半透明白背景冲淡 -->
+        <Grid x:Name="StripRoot" Grid.Row="0" Canvas.ZIndex="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -92,6 +80,25 @@
                   Background="Transparent" />
         </Grid>
 
-        <ContentPresenter x:Name="ContentHost" Grid.Row="1" />
+        <ContentPresenter x:Name="ContentHost"
+                          Grid.Row="1"
+                          Background="#F2FFFFFF" />
+
+        <!-- 标题栏底部 1px 分割线：画在内容区第一行（在金刚键/标签底色下沿之外，不会被覆盖），
+             选中标签处由代码挖洞 -->
+        <Canvas x:Name="BottomDividerCanvas"
+                Grid.Row="1"
+                Height="1"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False">
+            <Border x:Name="BottomDividerLeft"
+                    Canvas.Top="0"
+                    Height="1"
+                    Background="#1A000000" />
+            <Border x:Name="BottomDividerRight"
+                    Canvas.Top="0"
+                    Height="1"
+                    Background="#1A000000" />
+        </Canvas>
     </Grid>
 </UserControl>
