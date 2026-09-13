@@ -31,6 +31,7 @@ namespace MD.Controls
 
         private readonly SolidColorBrush _bodyBrush = new(Transparent);
         private readonly SolidColorBrush _stateBrush = new(Transparent);
+        private readonly SolidColorBrush _flareBrush = new(Transparent);
         private readonly SolidColorBrush _foregroundBrush = new(ForegroundNormal);
         private readonly SolidColorBrush _closeButtonBrush = new(Transparent);
 
@@ -62,8 +63,9 @@ namespace MD.Controls
             ConfigureFlare(RightFlareOutline, false, FlareSize + 1, CreateFlareArcGeometry(false));
 
             Body.Background = _bodyBrush;
-            LeftFlare.Fill = _bodyBrush;
-            RightFlare.Fill = _bodyBrush;
+            // 外翻角用独立画刷：未选中悬停时也要跟随悬停色，才能呈现"八"字圆弧底
+            LeftFlare.Fill = _flareBrush;
+            RightFlare.Fill = _flareBrush;
             StateBackground.Background = _stateBrush;
             HeaderText.Foreground = _foregroundBrush;
             IconControl.Foreground = _foregroundBrush;
@@ -218,6 +220,8 @@ namespace MD.Controls
             var storyboard = new Storyboard();
             AddColorAnimation(storyboard, _bodyBrush, bodyColor, animate);
             AddColorAnimation(storyboard, _stateBrush, stateColor, animate);
+            // 外翻角跟随"有效填充色"：选中=主体色，未选中=悬停/按下色（常态透明）
+            AddColorAnimation(storyboard, _flareBrush, _isSelected ? bodyColor : stateColor, animate);
             AddColorAnimation(storyboard, _foregroundBrush, foregroundColor, animate);
             storyboard.Begin();
 
